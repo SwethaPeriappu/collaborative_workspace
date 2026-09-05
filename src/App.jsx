@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import './App.css';
 
-const suggestedRooms = ['general', 'planning', 'design-review'];
+const suggestedRooms = ['General', 'Planning', 'Design Review'];
 
 function App() {
   const [message, setMessage] = useState('');
@@ -10,40 +10,72 @@ function App() {
   const [isSomeoneTyping, setIsSomeoneTyping] = useState(false);
   const [typerName, setTyperName] = useState('');
 
-
   const [nameInput, setNameInput] = useState('');
   const [onlineCount, setOnlineCount] = useState(0);
-  const [userName, setUserName] = useState(() => localStorage.getItem('userName') || '');
+
+  // Restore the username from localStorage when the app loads
+  const [userName, setUserName] = useState(
+    () => localStorage.getItem('userName') || ''
+  );
+
   const [roomInput, setRoomInput] = useState('');
-  const [currentRoom, setCurrentRoom] = useState(() => localStorage.getItem('currentRoom') || '');
+
+  // Restore the last room from localStorage
+  const [currentRoom, setCurrentRoom] = useState(
+    () => localStorage.getItem('currentRoom') || ''
+  );
+
   const [activeUsersList, setActiveUsersList] = useState([]);
 
   const isTypingLocally = useRef(false);
   const typingTimeout = useRef(null);
 
-  const sessionId = localStorage.getItem('sessionId') || crypto.randomUUID();
-  localStorage.setItem('sessionId', sessionId);
-  
+  /*
+   * Create a persistent session ID.
+   * socket.id is temporary and changes whenever the socket reconnects.
+   * sessionId stays the same for this browser session.
+   */
+  const sessionId = useRef(
+    localStorage.getItem('sessionId') || crypto.randomUUID()
+  );
+
+  useEffect(() => {
+    localStorage.setItem('sessionId', sessionId.current);
+  }, []);
+
   useEffect(() => {
     if (!userName) return;
-    const socketInstance = io.connect('http://localhost:3500', {
+
+    const socketInstance = io('http://localhost:3500', {
       transports: ['websocket'],
       auth: {
         username: userName,
-        sessionId
-      }
+        sessionId: sessionId.current,
+      },
+      // Explicitly enable Socket.IO reconnection
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
     });
 
     setSocket(socketInstance);
 
+    /*
+     * This event fires when:
+     * 1. The initial connection is established
+     * 2. The socket reconnects after a network failure
+     *
+     * We use it to rejoin the saved room.
+     */
     socketInstance.on('connect', () => {
+      console.log('Connected:', socketInstance.id);
       const savedRoom = localStorage.getItem('currentRoom');
       if (savedRoom) {
         setCurrentRoom(savedRoom);
         socketInstance.emit('join_room', savedRoom);
       }
     });
-  
+
     socketInstance.on('receive_text_update', (data) => {
       setMessage(data);
     });
@@ -62,6 +94,14 @@ function App() {
       setIsSomeoneTyping(data.isTyping);
     });
 
+    socketInstance.on('disconnect', (reason) => {
+      console.log('Disconnected:', reason);
+    });
+
+    socketInstance.on('connect_error', (error) => {
+      console.error('Socket connection error:', error.message);
+    });
+
     return () => {
       socketInstance.disconnect();
       if (typingTimeout.current) {
@@ -76,8 +116,9 @@ function App() {
     if (!trimmedName) {
       return;
     }
-    setUserName(trimmedName);
+    // Save the username so it survives a browser refresh
     localStorage.setItem('userName', trimmedName);
+    setUserName(trimmedName);
   };
 
   const handleJoinRoom = (e) => {
@@ -85,30 +126,32 @@ function App() {
     const trimmedRoom = roomInput.trim();
 
     if (trimmedRoom !== '' && socket) {
-      setCurrentRoom(trimmedRoom);
+      // Save the room so it survives a browser refresh
       localStorage.setItem('currentRoom', trimmedRoom);
+      setCurrentRoom(trimmedRoom);
       socket.emit('join_room', trimmedRoom);
     }
   };
 
   const handleChange = (e) => {
-    let value = e.target.value;
+    const value = e.target.value;
     setMessage(value);
-    if(socket && currentRoom) {
-      socket.emit('text_change', {room: currentRoom, value});
+
+    if (socket && currentRoom) {
+      socket.emit('text_change', { room: currentRoom, value });
 
       if (!isTypingLocally.current) {
         isTypingLocally.current = true;
-        socket.emit('typing', {room: currentRoom, username: userName});
+        socket.emit('typing', { room: currentRoom, username: userName });
       }
       if (typingTimeout.current) {
         clearTimeout(typingTimeout.current);
       }
 
       typingTimeout.current = setTimeout(() => {
-        socket.emit('stop_typing', {room: currentRoom, username: userName});
+        socket.emit('stop_typing', { room: currentRoom, username: userName });
         isTypingLocally.current = false;
-      }, 1500); 
+      }, 1500);
     }
   };
 
@@ -117,6 +160,7 @@ function App() {
       <div className="header">
         <h2>Collaborative Multi Room Editor</h2>
       </div>
+
       <div className="main-content">
         <div className="side-container">
           <div className="sidebar-section">
@@ -151,29 +195,37 @@ function App() {
             {currentRoom ? (
               <div className="sidebar-card sidebar-card-compact">
                 {activeUsersList.length > 0 ? (
-                  <ol className="user-list">
+                  <ul className="user-list">
                     {activeUsersList.map((name) => (
                       <li key={name}>{name}</li>
                     ))}
-                  </ol>
+                  </ul>
                 ) : (
-                  <p>Waiting for collaborators to join this room.</p>
+                  <p>
+                    Waiting for collaborators to join this room.
+                  </p>
                 )}
               </div>
             ) : (
               <div className="sidebar-card sidebar-card-compact sidebar-card-muted">
-                <p>Collaborators will appear here after you join a room.</p>
+                <p>
+                  Collaborators will appear here after you join a room.
+                </p>
               </div>
             )}
           </div>
         </div>
+
         <div className="msg-container">
           {!userName && (
             <section className="empty-panel">
               <span className="step-badge">Step 1</span>
               <h4>Enter your user name</h4>
 
-              <form className="inline-form" onSubmit={handleSetName}>
+              <form
+                className="inline-form"
+                onSubmit={handleSetName}
+              >
                 <input
                   type="text"
                   className="text-input"
@@ -181,7 +233,13 @@ function App() {
                   onChange={(e) => setNameInput(e.target.value)}
                   placeholder="Enter your name"
                 />
-                <button type="submit" disabled={!nameInput.trim()}>Set Name</button>
+
+                <button
+                  type="submit"
+                  disabled={!nameInput.trim()}
+                >
+                  Set Name
+                </button>
               </form>
             </section>
           )}
@@ -190,9 +248,15 @@ function App() {
             <section className="empty-panel">
               <span className="step-badge">Step 2</span>
               <h4>Join a room</h4>
-              <p>Create a room name or reuse an existing one so everyone lands in the same shared editor.</p>
+              <p>
+                Create a room name or reuse an existing one so
+                everyone lands in the same shared editor.
+              </p>
 
-              <form className="inline-form" onSubmit={handleJoinRoom}>
+              <form
+                className="inline-form"
+                onSubmit={handleJoinRoom}
+              >
                 <input
                   type="text"
                   className="text-input"
@@ -200,7 +264,12 @@ function App() {
                   onChange={(e) => setRoomInput(e.target.value)}
                   placeholder="Enter room name"
                 />
-                <button type="submit" disabled={!roomInput.trim()}>Join Room</button>
+                <button
+                  type="submit"
+                  disabled={!roomInput.trim()}
+                >
+                  Join Room
+                </button>
               </form>
 
               <div className="suggested-rooms">
@@ -223,8 +292,13 @@ function App() {
                 <strong>Active Users in this room: </strong>
                 {activeUsersList.join(', ')}
               </div>
-              <p>Anyone visiting the room will see this message.</p>
-              <p> 👥 {onlineCount} {onlineCount === 1 ? 'User': 'Users'} online</p>
+              <p>
+                Anyone visiting the room will see this message.
+              </p>
+              <p>
+                👥 {onlineCount}{' '}
+                {onlineCount === 1 ? 'User' : 'Users'} online
+              </p>
 
               <textarea
                 id="msg"
@@ -234,13 +308,15 @@ function App() {
                 placeholder="Type something here..."
                 spellCheck="false"
               />
-              {isSomeoneTyping && <p>{typerName} is typing...</p>}
+              {isSomeoneTyping && (
+                <p>{typerName} is typing...</p>
+              )}
             </>
           )}
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 export default App;
