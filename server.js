@@ -2,6 +2,7 @@ import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import { Server } from 'socket.io';
+import * as Y from 'yjs';
 
 const app = express();
 app.use(cors());
@@ -14,8 +15,16 @@ const io = new Server(server, {
   }
 });
 
-// Stores the latest text for each room
-const roomTextData = {};
+// Stores one Ydoc for each room
+const roomDocuments = new Map();
+
+function getRoomDocument(room) {
+  if (!roomDocuments.has(room)) {
+    roomDocuments.set(room, new Y.Doc());
+  }
+
+  return roomDocuments.get(room);
+}
 
 io.on('connection', (socket) => {
   /*
@@ -24,9 +33,12 @@ io.on('connection', (socket) => {
    * username -> display name
    * sessionId -> stable browser session identifier
    */
-  const { username, sessionId } = socket.handshake.auth;
+  const {
+    username = 'Anonymous',
+    sessionId = null
+  } = socket.handshake.auth || {};
 
-  socket.username = username || 'Anonymous';
+  socket.username = username;
   socket.sessionId = sessionId;
   console.log(`Connection initiated: ${socket.id} with username: ${socket.username} sessionId: ${socket.sessionId}`);
 
@@ -37,9 +49,7 @@ io.on('connection', (socket) => {
     if (!room) {
       return;
     }
-    /*
-     * If the user is already in another room, remove them from that room first.
-     */
+    /* If the user is already in another room, remove them from that room first. */
     if (socket.currentRoom && socket.currentRoom !== room) {
       socket.leave(socket.currentRoom);
       sendUpdatedRoomDetails(socket.currentRoom);
@@ -52,8 +62,10 @@ io.on('connection', (socket) => {
     /*
      * Send the existing document content to the user who just joined.
      */
-    const initialText = roomTextData[room] || '';
-    socket.emit('receive_text_update', initialText);
+    const ydoc = getRoomDocument(room);
+    const initialState = Y.encodeStateAsUpdate(ydoc);
+    socket.emit('yjs_sync', Array.from(initialState));
+
     /*
      * Update active users in the room.
      */
@@ -70,29 +82,45 @@ io.on('connection', (socket) => {
   // io.emit('user_count', currentState.size);
 
   /*
-   * TEXT CHANGE
-   */
-  socket.on('text_change', (data) => {
-    const { room, value } = data;
-    if (!room) {
+  * RECEIVE YJS UPDATE
+  */
+  socket.on('yjs_update', ({room, update}) => {
+    if (!room || !update) {
       return;
     }
-    /*
-     * Store the latest document content.
-     */
-    roomTextData[room] = value;
 
+    const ydoc = getRoomDocument(room);
+    const binaryUpdate = new Uint8Array(update);
+    Y.applyUpdate(ydoc, binaryUpdate);
+    
     /*
-     * Send the update to everyone else
-     * in the same room.
+     * Forward the update to everybody else in the room.
+     * We DON'T send it back to the original sender.
      */
-    socket.to(room).emit('receive_text_update', value);
+    socket.to(room).emit('yjs_update', Array.from(binaryUpdate));
   });
+
+  /*
+   * TEXT CHANGE
+   */
+  // socket.on('text_change', (data) => {
+  //   const { room, value } = data;
+  //   if (!room) {
+  //     return;
+  //   }
+  //   /* Store the latest document content. */
+  //   roomTextData[room] = value;
+  //   /* Send the update to everyone else in the same room. */
+  //   socket.to(room).emit('receive_text_update', value);
+  // });
 
   /*
    * USER STARTED TYPING
    */
   socket.on('typing', ({ room, username }) => {
+    if (!room) {
+      return;
+    }
     socket.to(room).emit('user_typing', { username, isTyping: true });
   });
 
@@ -100,8 +128,30 @@ io.on('connection', (socket) => {
    * USER STOPPED TYPING
    */
   socket.on('stop_typing', ({ room, username }) => {
+    if (!room) {
+      return;
+    }
     socket.to(room).emit('user_typing', { username, isTyping: false });
   });
+
+   /*
+   * LEAVE ROOM
+   */
+  socket.on('leave_room', (room) => {
+    const targetRoom = room || socket.currentRoom;
+    if (!targetRoom) {
+      return;
+    }
+
+    socket.leave(targetRoom);
+    if (socket.currentRoom === targetRoom) {
+      socket.currentRoom = null;
+    }
+
+    console.log(`User ${socket.username} left room: ${targetRoom}`);
+    sendUpdatedRoomDetails(targetRoom);
+  });
+
 
   /*
    * DISCONNECT
@@ -137,7 +187,7 @@ function sendUpdatedRoomDetails(room) {
 }
 
 
-const port = 3500;
+const port = Number(process.env.PORT) || 3500;
 server.listen(port, () => {
   console.log(`Multi-room server running on port ${port}`);
 });

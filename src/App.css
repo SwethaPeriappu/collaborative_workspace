@@ -186,6 +186,20 @@
   margin: 0;
 }
 
+.roomHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.btn {
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  background-color: #97cbde;
+}
+
 .suggested-rooms {
   display: flex;
   flex-wrap: wrap;
