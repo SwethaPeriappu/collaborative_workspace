@@ -349,176 +349,198 @@ function App() {
     setTyperName('');
 
     localStorage.removeItem('currentRoom');
-  }
+  };
+
+  const initials = userName
+    ? userName
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0].toUpperCase())
+        .join('')
+    : 'U';
 
   return (
-    <div className="app-container">
-      <div className="header">
-        <h2>Collaborative Multi Room Editor</h2>
-      </div>
-
-      <div className="main-content">
-        <div className="side-container">
-          <div className="sidebar-section">
-            <div className="sidebar-heading">
-              <p className="sidebar-label">Profile</p>
-              <span className={`status-pill ${userName ? 'active' : 'idle'}`}>
-                {userName ? 'Ready' : 'Pending'}
-              </span>
-            </div>
-            <div className="sidebar-card">
-              <h4>{userName || 'Add your name'}</h4>
+    <div className="app-shell">
+      <div className="workspace-panel">
+        <header className="topbar">
+          <div className="brand-block">
+            <div className="brand-mark">S</div>
+            <div>
+              <p className="brand-label">SyncRoom</p>
+              <span className="brand-subtitle">Realtime collaboration</span>
             </div>
           </div>
+        </header>
 
-          <div className="sidebar-section">
-            <div className="sidebar-heading">
-              <p className="sidebar-label">Room</p>
-              <span className={`status-pill ${currentRoom ? 'active' : 'idle'}`}>
-                {currentRoom ? 'Joined' : 'Waiting'}
-              </span>
-            </div>
-            <div className="sidebar-card">
-              <h4>{currentRoom || 'Join a room'}</h4>
-              <p>
-                {currentRoom && `${onlineCount} ${onlineCount === 1 ? 'person is' : 'people are'} editing here.`}
-              </p>
-            </div>
-          </div>
-
-          <div className="sidebar-section">
-            <p className="sidebar-label">People</p>
-            {currentRoom ? (
-              <div className="sidebar-card sidebar-card-compact">
-                {activeUsersList.length > 0 ? (
-                  <ul className="user-list">
-                    {activeUsersList.map((name) => (
-                      <li key={name}>{name}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p>
-                    Waiting for collaborators to join this room.
-                  </p>
-                )}
+        <div className="main-content">
+          <aside className="side-container">
+            <div className="sidebar-section">
+              <div className="sidebar-heading">
+                <p className="sidebar-label">Profile</p>
+                <span className={`status-pill ${userName ? 'active' : 'idle'}`}>
+                  {userName ? 'Ready' : 'Pending'}
+                </span>
               </div>
-            ) : (
-              <div className="sidebar-card sidebar-card-compact sidebar-card-muted">
+
+              <div className="sidebar-card profile-card">
+                <div className="profile-identity">
+                  <div className="profile-avatar">{initials}</div>
+                  <div>
+                    <h4>{userName || 'Add your name'}</h4>
+                    <p>{userName ? 'Connected to the shared workspace.' : 'Set your identity for teammates.'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="sidebar-section">
+              <div className="sidebar-heading">
+                <p className="sidebar-label">Room</p>
+                <span className={`status-pill ${currentRoom ? 'active' : 'idle'}`}>
+                  {currentRoom ? 'Joined' : 'Waiting'}
+                </span>
+              </div>
+              <div className="sidebar-card">
+                <h4>{currentRoom || 'Join a room'}</h4>
                 <p>
-                  Collaborators will appear here after you join a room.
+                  {currentRoom
+                    ? `${onlineCount} ${onlineCount === 1 ? 'person is' : 'people are'} in this room.`
+                    : 'Choose a shared room to start collaborating.'}
                 </p>
               </div>
-            )}
-          </div>
-        </div>
+            </div>
 
-        <div className="msg-container">
-          {!userName && (
-            <section className="empty-panel">
-              <span className="step-badge">Step 1</span>
-              <h4>Enter your user name</h4>
-
-              <form
-                className="inline-form"
-                onSubmit={handleSetName}
-              >
-                <input
-                  type="text"
-                  className="text-input"
-                  value={nameInput}
-                  onChange={(e) => setNameInput(e.target.value)}
-                  placeholder="Enter your name"
-                />
-
-                <button
-                  type="submit"
-                  disabled={!nameInput.trim()}
-                >
-                  Set Name
-                </button>
-              </form>
-            </section>
-          )}
-
-          {userName && !currentRoom && (
-            <section className="empty-panel">
-              <span className="step-badge">Step 2</span>
-              <h4>Join a room</h4>
-              <p>
-                Create a room name or reuse an existing one so
-                everyone lands in the same shared editor.
-              </p>
-
-              <form
-                className="inline-form"
-                onSubmit={handleJoinRoom}
-              >
-                <input
-                  type="text"
-                  className="text-input"
-                  value={roomInput}
-                  onChange={(e) => setRoomInput(e.target.value)}
-                  placeholder="Enter room name"
-                />
-                <button
-                  type="submit"
-                  disabled={!roomInput.trim()}
-                >
-                  Join Room
-                </button>
-              </form>
-
-              <div className="suggested-rooms">
-                {suggestedRooms.map((room) => (
-                  <button
-                    key={room}
-                    type="button"
-                    className="room-chip"
-                    onClick={() => setRoomInput(room)}
-                  >
-                    {room}
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-          {currentRoom && (
-            <>
-              <div className="roomHeader">
-                <div>
-                  <strong>Room: </strong>
-                  {currentRoom}
+            <div className="sidebar-section">
+              <p className="sidebar-label">People</p>
+              {currentRoom ? (
+                <div className="sidebar-card sidebar-card-compact">
+                  {activeUsersList.length > 0 ? (
+                    <ul className="user-list">
+                      {activeUsersList.map((name) => (
+                        <li key={name}>
+                          <span className="user-dot" />
+                          {name}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>Waiting for collaborators to join this room.</p>
+                  )}
                 </div>
-                <button className="btn" onClick={handleLeaveRoom}>
-                  Leave Room
-                </button>
-              </div>
-
-              <div>
-                <strong>Active Users in this room: </strong>
-                {activeUsersList.join(', ')}
-              </div>
-              <p>
-                Anyone visiting the room will see this message.
-              </p>
-              <p>
-                👥 {onlineCount}{' '}
-                {onlineCount === 1 ? 'User' : 'Users'} online
-              </p>
-
-              <textarea
-                id="msg"
-                className="msg-box"
-                value={message}
-                onChange={handleChange}
-                placeholder="Type something here..."
-                spellCheck="false"
-              />
-              {isSomeoneTyping && (
-                <p>{typerName} is typing...</p>
+              ) : (
+                <div className="sidebar-card sidebar-card-compact sidebar-card-muted">
+                  <p>Collaborators will appear here after you join a room.</p>
+                </div>
               )}
-            </>
-          )}
+            </div>
+          </aside>
+
+          <main className="msg-container">
+            {!userName && (
+              <section className="empty-panel">
+                <div className="onboarding-copy">
+                  <span className="step-badge">Step 1</span>
+                  <h4>Set your identity</h4>
+                  <p>Choose a name so your teammates know who is editing in real time.</p>
+                </div>
+
+                <form className="inline-form" onSubmit={handleSetName}>
+                  <input
+                    type="text"
+                    className="text-input"
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    placeholder="Enter your display name"
+                  />
+
+                  <button type="submit" disabled={!nameInput.trim()}>
+                    Save name
+                  </button>
+                </form>
+              </section>
+            )}
+
+            {userName && !currentRoom && (
+              <section className="empty-panel">
+                <div className="onboarding-copy">
+                  <span className="step-badge">Step 2</span>
+                  <h4>Choose a room</h4>
+                  <p>Sync a shared space with the people working on the same document.</p>
+                </div>
+
+                <form className="inline-form" onSubmit={handleJoinRoom}>
+                  <input
+                    type="text"
+                    className="text-input"
+                    value={roomInput}
+                    onChange={(e) => setRoomInput(e.target.value)}
+                    placeholder="Enter room name"
+                  />
+                  <button type="submit" disabled={!roomInput.trim()}>
+                    Join room
+                  </button>
+                </form>
+
+                <div className="suggested-rooms">
+                  {suggestedRooms.map((room) => (
+                    <button
+                      key={room}
+                      type="button"
+                      className="room-chip"
+                      onClick={() => setRoomInput(room)}
+                    >
+                      {room}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {currentRoom && (
+              <div className="editor-shell">
+                <div className="roomHeader">
+                  <div className="room-title-wrap">
+                    <span className="room-label">Room</span>
+                    <h3>{currentRoom}</h3>
+                  </div>
+                  <button type="button" className="btn" onClick={handleLeaveRoom}>
+                    Leave room
+                  </button>
+                </div>
+
+                <div className="collab-toolbar">
+                  <div className="presence-pill">
+                    <span className="presence-dot" />
+                    {onlineCount} {onlineCount === 1 ? 'person' : 'people'} online
+                  </div>
+                  <div className="presence-list">
+                    {activeUsersList.length > 0 ? activeUsersList.join(' • ') : 'No one else has joined yet'}
+                  </div>
+                </div>
+
+                <div className="editor-meta">
+                  <p>Updates are shared instantly across the room.</p>
+                </div>
+
+                <textarea
+                  id="msg"
+                  className="msg-box"
+                  value={message}
+                  onChange={handleChange}
+                  placeholder="Type something here..."
+                  spellCheck="false"
+                />
+
+                {isSomeoneTyping && (
+                  <div className="typing-indicator">
+                    <span className="typing-dot" />
+                    {typerName} is typing...
+                  </div>
+                )}
+              </div>
+            )}
+          </main>
         </div>
       </div>
     </div>
