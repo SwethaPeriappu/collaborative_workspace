@@ -1,14 +1,24 @@
-# Collaborative Workspace
+# Workspace collaboration
 
-Collaborative workspace is a real-time collaborative editor built with React, Vite, Socket.IO, and Yjs. It allows multiple users to join a shared room, type in a synchronized document, and see live presence updates as others join, leave, and type.
+Workspace collaboration is a local-first collaborative workspace built with React, Vite, Socket.IO, and Yjs. It supports both shared room collaboration and private personal note-taking in the same app.
 
-## Features
+## What it does
 
-- Multi-room collaboration
-- Shared live text editing with Yjs
-- Online user presence tracking
-- Typing status indicators
-- Simple room-based workflow for quick collaboration
+- Join a shared room and edit the same document in real time
+- See live presence and online collaborator counts
+- Receive typing indicators from other users in the room
+- Open a personal workspace without creating or joining a room
+- Create, save, reopen, and delete personal documents locally in the browser
+- Auto-save document content and title as you type
+- Keep the private notes list visible in the sidebar for quick access
+
+## Current app structure
+
+- `src/App.jsx` handles the top-level layout and composes the app shell
+- `src/components/Sidebar.jsx` renders the left navigation and saved-documents list
+- `src/components/EditorPanel.jsx` renders the editor, onboarding, and room views
+- `src/hooks/useWorkspaceState.js` contains the shared state and behavior for rooms, Yjs syncing, and personal documents
+- `server.js` runs the Socket.IO backend for real-time room synchronization
 
 ## Tech stack
 
@@ -16,7 +26,8 @@ Collaborative workspace is a real-time collaborative editor built with React, Vi
 - Vite
 - Socket.IO
 - Yjs
-- Express server
+- Express
+- Local browser storage for personal document persistence
 
 ## Run locally
 
@@ -26,8 +37,11 @@ npm run server
 npm run dev
 ```
 
-Then open the app in the browser and join a room to start collaborating.
+Then open the app in the browser and either:
+
+1. join a room to collaborate with others, or
+2. create a personal document to work privately without entering a room.
 
 ## Notes
 
-This project is designed as a lightweight collaborative workspace demo and can be extended with authentication, persisted rooms, richer editing tools, and production-level deployment setup.
+This project is designed as a lightweight collaborative workspace demo with a personal-document workflow. It is a good starting point for adding authentication, cloud persistence, richer editing tools, room history, or production deployment setup.
